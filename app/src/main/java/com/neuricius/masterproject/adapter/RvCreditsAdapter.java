@@ -110,7 +110,7 @@ public class RvCreditsAdapter extends RecyclerView.Adapter<RvCreditsAdapter.MyCr
 
     private void getMovieService(Integer idMovie) {
         HashMap<String, String> queryParams = new HashMap<>();
-        queryParams.put(TMDB_APIKEY_PARAM_NAME, Contract.API_KEY);
+        queryParams.put(TMDB_APIKEY_PARAM_NAME, Contract.getApiKey(context));
 
         Call<Movie> call = TmdbApiService.apiInterface().TMDBGetMovie(idMovie ,queryParams);
         call.enqueue(new Callback<Movie>() {

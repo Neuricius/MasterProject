@@ -9,9 +9,7 @@ import androidx.appcompat.app.AlertDialog;
 
 import com.neuricius.masterproject.R;
 import com.squareup.picasso.Picasso;
-import com.squareup.picasso.Target;
 
-import static com.neuricius.masterproject.util.UtilTools.AUTHOR_NAME;
 
 public class AboutDialog extends AlertDialog.Builder {
 
@@ -20,7 +18,7 @@ public class AboutDialog extends AlertDialog.Builder {
 
         setTitle(R.string.drawer_about);
 
-        String dialogText = context.getResources().getString(R.string.author) + ": "+AUTHOR_NAME + " \n" +
+        String dialogText = context.getResources().getString(R.string.author) + ": " + context.getResources().getString(R.string.author_name) + " \n" +
                             " \n "+
                             context.getResources().getString(R.string.powered_by) + ": ";
 

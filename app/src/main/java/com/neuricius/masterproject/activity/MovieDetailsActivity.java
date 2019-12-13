@@ -34,6 +34,7 @@ import com.neuricius.masterproject.net.Contract;
 import com.neuricius.masterproject.net.TmdbApiService;
 import com.neuricius.masterproject.net.model.Genre;
 import com.neuricius.masterproject.net.model.Movie;
+import com.neuricius.masterproject.util.PermissionCheck;
 import com.neuricius.masterproject.util.UtilTools;
 import com.squareup.picasso.Picasso;
 
@@ -212,10 +213,10 @@ public class MovieDetailsActivity extends AppCompatActivity {
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.activity_detail_options_menu, menu);
         switch (getIntent().getStringExtra(INTENT_ORIGIN)) {
-            case "net":
+            case INTENT_ORIGIN_NET:
                 menu.findItem(R.id.action_add).setTitle(getResources().getString(R.string.add_to_favorites));
                 break;
-            case "db":
+            case INTENT_ORIGIN_DATABASE:
                 menu.findItem(R.id.action_add).setTitle(getResources().getString(R.string.remove_from_favorites));
                 break;
             default:
@@ -229,11 +230,19 @@ public class MovieDetailsActivity extends AppCompatActivity {
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
             case R.id.action_add:
-                switch (INTENT_ORIGIN) {
+                switch (getIntent().getStringExtra(INTENT_ORIGIN)) {
                     case INTENT_ORIGIN_NET:
+                        boolean storagePermGranted;
+                        do{
+                            storagePermGranted = PermissionCheck.isStoragePermissionGranted(MovieDetailsActivity.this);
+                        } while (!storagePermGranted);
                         addMovieToDB();
                         break;
                     case INTENT_ORIGIN_DATABASE:
+                        boolean storagePermGranted2;
+                        do{
+                            storagePermGranted2 = PermissionCheck.isStoragePermissionGranted(MovieDetailsActivity.this);
+                        } while (!storagePermGranted2);
                         removeMovieFromDB();
                         break;
                     default:
@@ -252,8 +261,8 @@ public class MovieDetailsActivity extends AppCompatActivity {
                     .eq(MovieDB.FIELD_NAME_TITLE, movieDBholder.getTitle())
                     .query();
 
-            int brObrisanih = getDatabaseHelper().getMovieDao().delete(listaZaBrisanje);
-            UtilTools.sharedPrefNotify(MovieDetailsActivity.this, getResources().getString(R.string.entries_deleted_no) + brObrisanih);
+            int deletedEntriesNo = getDatabaseHelper().getMovieDao().delete(listaZaBrisanje);
+            UtilTools.sharedPrefNotify(MovieDetailsActivity.this, getResources().getString(R.string.deleted) ,getResources().getString(R.string.entries_deleted_no) + deletedEntriesNo);
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -271,11 +280,11 @@ public class MovieDetailsActivity extends AppCompatActivity {
 
         try {
             getDatabaseHelper().getMovieDao().create(movieDB);
-            UtilTools.sharedPrefNotify(MovieDetailsActivity.this, getResources().getString(R.string.movie_added_to_favorites));
+            UtilTools.sharedPrefNotify(MovieDetailsActivity.this, getResources().getString(R.string.success) ,getResources().getString(R.string.movie_added_to_favorites));
         } catch (SQLException e) {
             Log.e(LOG_TAG_SQL_EXCEPTION, e.getMessage());
             e.printStackTrace();
-            UtilTools.sharedPrefNotify(MovieDetailsActivity.this, getResources().getString(R.string.error_try_again_later));
+            UtilTools.sharedPrefNotify(MovieDetailsActivity.this, getResources().getString(R.string.error) ,getResources().getString(R.string.please_try_again_later));
         }
 
     }
@@ -352,7 +361,7 @@ public class MovieDetailsActivity extends AppCompatActivity {
     private void getMovieService(Integer idMovie){
 
         HashMap<String, String> queryParams = new HashMap<>();
-        queryParams.put(TMDB_APIKEY_PARAM_NAME, Contract.API_KEY);
+        queryParams.put(TMDB_APIKEY_PARAM_NAME, Contract.getApiKey(getBaseContext()));
 
         Call<Movie> call = TmdbApiService.apiInterface().TMDBGetMovie(idMovie, queryParams);
         call.enqueue(new Callback<Movie>() {
@@ -361,7 +370,7 @@ public class MovieDetailsActivity extends AppCompatActivity {
                 if (response.code() == 200){
                     setupMovieDetails(response.body());
                 } else {
-                    UtilTools.sharedPrefNotify(MovieDetailsActivity.this, getResources().getString(R.string.error) + response.code());
+                    UtilTools.sharedPrefNotify(MovieDetailsActivity.this, getResources().getString(R.string.error), "" + response.code());
                 }
 
             }

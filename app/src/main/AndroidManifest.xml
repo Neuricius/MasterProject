@@ -2,14 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     package="com.neuricius.masterproject">
-
-<!--    Automatically granted on request-->
+    <!-- Automatically granted on request -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-
-<!--    For API 23 and up beside here permission also has to be requested dynamically-->
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    <!-- For API 23 and up beside here permission also has to be requested dynamically -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
 
     <application
         android:allowBackup="true"
@@ -20,14 +18,8 @@
         android:theme="@style/Theme.AppCompat.DayNight.NoActionBar"
         tools:ignore="GoogleAppIndexingWarning">
         <activity
-            android:name=".activity.MovieDetailsActivity"
-            android:theme="@style/Theme.AppCompat.DayNight.NoActionBar"/>
-        <activity
-            android:name=".activity.FavoritesActivity"
-            android:theme="@style/Theme.AppCompat.DayNight.NoActionBar"/>
-        <activity
-            android:name=".activity.SearchActorsActivity"
-            android:theme="@style/Theme.AppCompat.DayNight.NoActionBar">
+            android:name=".activity.SplashScreenActivity"
+            android:noHistory="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -35,18 +27,27 @@
             </intent-filter>
         </activity>
         <activity
+            android:name=".activity.MovieDetailsActivity"
+            android:theme="@style/Theme.AppCompat.DayNight.NoActionBar" />
+        <activity
+            android:name=".activity.FavoritesActivity"
+            android:theme="@style/Theme.AppCompat.DayNight.NoActionBar" />
+        <activity
+            android:name=".activity.SearchActorsActivity"
+            android:theme="@style/Theme.AppCompat.DayNight.NoActionBar">
+
+        </activity>
+        <activity
             android:name=".activity.ActorDetailsActivity"
             android:theme="@style/Theme.AppCompat.DayNight.NoActionBar" />
         <activity
             android:name=".activity.SettingsActivity"
             android:theme="@style/Theme.AppCompat.DayNight.NoActionBar" />
-
         <!--
         Moramo definisati punu putanju do naseg servis-a.
         Ovo je obavezno, bez definicije servis-a necemo moci ni da ga koristimo.
         -->
         <service android:name=".async.SimpleService" />
-
         <!--
         Moramo definisati punu putanju do naseg receiver-a.
         Ovo je obavezno, bez definicije receiver-a necemo moci ni da ga koristimo.

@@ -8,11 +8,18 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
+import android.preference.ListPreference;
+import android.preference.PreferenceScreen;
 import android.util.Log;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
@@ -24,6 +31,7 @@ import com.neuricius.masterproject.R;
 import com.neuricius.masterproject.async.SimpleReceiver;
 import com.neuricius.masterproject.async.SimpleService;
 import com.neuricius.masterproject.dialog.AboutDialog;
+import com.neuricius.masterproject.dialog.CustomDialog;
 import com.neuricius.masterproject.net.model.Cast;
 import com.neuricius.masterproject.net.model.Credit;
 
@@ -41,13 +49,12 @@ import java.util.List;
 public class UtilTools {
 
     private static AlertDialog dialog;
+    private static CustomDialog customDialog;
     private static SharedPreferences sharedPreferences;
 
     private static SimpleReceiver sync;
     private static PendingIntent pintent;
     private static AlarmManager alarm;
-
-    public static final String AUTHOR_NAME = "Nebojsa Matic";
 
     public static final String NOTIFY_TOAST = "notifyByToast";
     public static final String NOTIFY_STATUS = "notifyByStatusBar";
@@ -133,18 +140,23 @@ public class UtilTools {
         dialog.show();
     }
 
-    public static void sharedPrefNotify(Context context, String msg){
+    /**Rad sa shared preferences**/
+    public static void sharedPrefNotify(Context context, String title, String msg){
         sharedPreferences = PreferenceManager.getDefaultSharedPreferences(context);
 
-        boolean toast = sharedPreferences.getBoolean(NOTIFY_TOAST, false);
-        boolean status = sharedPreferences.getBoolean(NOTIFY_STATUS, false);
 
-        if (toast){
-            showToast(context, msg);
-        }
+        int notifyType = Integer.parseInt(sharedPreferences.getString(context.getResources().getString(R.string.notify_user_list), "1"));
 
-        if (status){
-            showStatusMesage(context, msg);
+        switch (notifyType) {
+            case 1:
+                showToast(context, msg);
+                break;
+            case 2:
+                showStatusMesage(context, title, msg);
+                break;
+            case 3:
+                new CustomDialog(context, title, msg);
+                break;
         }
     }
 
@@ -155,23 +167,30 @@ public class UtilTools {
         boolean warn = sharedPreferences.getBoolean(WARN_NO_WIFI, false);
 
         if (conn && warn && getConnectivityStatus(activity) != TYPE_WIFI){
-            sharedPrefNotify(activity, activity.getResources().getString(R.string.not_on_wifi));
+            sharedPrefNotify(activity, activity.getResources().getString(R.string.aborted) ,activity.getResources().getString(R.string.not_on_wifi));
             return true;
         }
 
         return false;
     }
 
+    public static boolean sharedPrefNoSplashScreen(Context context){
+        sharedPreferences = PreferenceManager.getDefaultSharedPreferences(context);
+        boolean showSplash = sharedPreferences.getBoolean(context.getResources().getString(R.string.splash_screen_on), false);
+        return showSplash;
+    }
+    /** **/
+
 
     public static void showToast(Context context, String text){
         Toast.makeText(context, text, Toast.LENGTH_SHORT).show();
     }
 
-    public static void showStatusMesage(Context context, String message){
+    public static void showStatusMesage(Context context, String title, String message){
         NotificationManager mNotificationManager = (NotificationManager)context.getSystemService(Context.NOTIFICATION_SERVICE);
-        NotificationCompat.Builder mBuilder = new NotificationCompat.Builder(context);
+        NotificationCompat.Builder mBuilder = new NotificationCompat.Builder(context, "1");
         mBuilder.setSmallIcon(R.drawable.ic_pic_error_foreground);
-        mBuilder.setContentTitle("Master Project");
+        mBuilder.setContentTitle(title);
         mBuilder.setContentText(message);
 
         Bitmap bm = BitmapFactory.decodeResource(context.getResources(), R.drawable.ic_pic_error_foreground);
@@ -289,7 +308,7 @@ public class UtilTools {
                     calculateTimeTillNextSync(minutes, seconds),
                     pintent);
 
-            sharedPrefNotify(activity, "Alarm Set");
+            sharedPrefNotify(activity, "Alarm Manager" ,"Alarm Set");
         }
     }
 

@@ -242,7 +242,7 @@ public class SearchActorsActivity extends AppCompatActivity {
         /* https://api.themoviedb.org/3/search/person?api_key=50038a6708b8a31d633d6e86190e6cd9&query=Brian%20Adams */
         HashMap<String, String> queryParams = new HashMap<>();
         queryParams.put(TMDB_QUERY_PARAM_NAME, query);
-        queryParams.put(TMDB_APIKEY_PARAM_NAME, Contract.API_KEY);
+        queryParams.put(TMDB_APIKEY_PARAM_NAME, Contract.getApiKey(getBaseContext()));
 
         Call<SearchResult> call = TmdbApiService.apiInterface().TMDBSearchPeople(queryParams);
         call.enqueue(new Callback<SearchResult>() {
@@ -252,13 +252,13 @@ public class SearchActorsActivity extends AppCompatActivity {
                     SearchResult resp = response.body();
                     setupResultListRV(resp.getResults());
                 } else {
-                    UtilTools.sharedPrefNotify(SearchActorsActivity.this, "Error " + response.code());
+                    UtilTools.sharedPrefNotify(SearchActorsActivity.this, getResources().getString(R.string.error), "" + response.code());
                 }
             }
 
             @Override
             public void onFailure(Call<SearchResult> call, Throwable t) {
-                UtilTools.sharedPrefNotify(SearchActorsActivity.this, "Error " + t.getMessage());
+                UtilTools.sharedPrefNotify(SearchActorsActivity.this, getResources().getString(R.string.error), "" + t.getMessage());
             }
         });
     }

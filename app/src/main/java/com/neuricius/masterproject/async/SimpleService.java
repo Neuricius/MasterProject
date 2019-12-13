@@ -38,7 +38,7 @@ public class SimpleService extends Service{
          * npr. sinhronizacija mail-ova fotografija, muzike dokumenata isl.
          * */
         if(status != UtilTools.TYPE_WIFI){
-            UtilTools.sharedPrefNotify(getApplicationContext(), "Not on Wifi");
+            UtilTools.sharedPrefNotify(getApplicationContext(), "Aborted" , "Not on Wifi");
 
 //            new SimpleSyncTask(getApplicationContext()).execute(status);
         }

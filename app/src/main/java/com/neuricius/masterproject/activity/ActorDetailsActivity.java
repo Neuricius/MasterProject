@@ -233,11 +233,11 @@ public class ActorDetailsActivity extends AppCompatActivity {
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.activity_detail_options_menu, menu);
-        switch (getIntent().getStringExtra("origin")) {
-            case "net":
+        switch (getIntent().getStringExtra(INTENT_ORIGIN)) {
+            case INTENT_ORIGIN_NET:
                 menu.findItem(R.id.action_add).setTitle(getResources().getString(R.string.add_to_favorites));
                 break;
-            case "db":
+            case INTENT_ORIGIN_DATABASE:
                 menu.findItem(R.id.action_add).setTitle(getResources().getString(R.string.remove_from_favorites));
                 break;
             default:
@@ -251,15 +251,15 @@ public class ActorDetailsActivity extends AppCompatActivity {
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
             case R.id.action_add:
-                switch (getIntent().getStringExtra("origin")) {
-                    case "net":
+                switch (getIntent().getStringExtra(INTENT_ORIGIN)) {
+                    case INTENT_ORIGIN_NET:
                         boolean storagePermGranted;
                         do{
                             storagePermGranted = PermissionCheck.isStoragePermissionGranted(ActorDetailsActivity.this);
                         } while (!storagePermGranted);
                         addActorToDB();
                         break;
-                    case "db":
+                    case INTENT_ORIGIN_DATABASE:
                         boolean storagePermGranted2;
                         do{
                             storagePermGranted2 = PermissionCheck.isStoragePermissionGranted(ActorDetailsActivity.this);
@@ -283,8 +283,8 @@ public class ActorDetailsActivity extends AppCompatActivity {
                         .eq(ActorDB.FIELD_NAME_NAME, actorDBholder.getName())
                         .query();
 
-                int brObrisanih = getDatabaseHelper().getActorDao().delete(listaZaBrisanje);
-                UtilTools.sharedPrefNotify(ActorDetailsActivity.this, getResources().getString(R.string.entries_deleted_no) + brObrisanih);
+                int deletedEntriesNo = getDatabaseHelper().getActorDao().delete(listaZaBrisanje);
+                UtilTools.sharedPrefNotify(ActorDetailsActivity.this, getResources().getString(R.string.deleted) ,getResources().getString(R.string.entries_deleted_no) + deletedEntriesNo);
             } catch (SQLException e) {
                 e.printStackTrace();
             }
@@ -305,10 +305,10 @@ public class ActorDetailsActivity extends AppCompatActivity {
 
             try {
                 getDatabaseHelper().getActorDao().create(actorDB);
-                UtilTools.sharedPrefNotify(ActorDetailsActivity.this, getResources().getString(R.string.actor_added_to_favorites));
+                UtilTools.sharedPrefNotify(ActorDetailsActivity.this, getResources().getString(R.string.success) , getResources().getString(R.string.actor_added_to_favorites));
             } catch (SQLException e) {
                 e.printStackTrace();
-                UtilTools.sharedPrefNotify(ActorDetailsActivity.this, getResources().getString(R.string.error_try_again_later));
+                UtilTools.sharedPrefNotify(ActorDetailsActivity.this, getResources().getString(R.string.error) ,getResources().getString(R.string.please_try_again_later));
             }
 
 
@@ -366,7 +366,7 @@ public class ActorDetailsActivity extends AppCompatActivity {
 
     private void getActorService(Integer idActor) {
         HashMap<String, String> queryParams = new HashMap<>();
-        queryParams.put(TMDB_APIKEY_PARAM_NAME, Contract.API_KEY);
+        queryParams.put(TMDB_APIKEY_PARAM_NAME, Contract.getApiKey(ActorDetailsActivity.this));
 
         Call<Actor> call = TmdbApiService.apiInterface().TMDBGetActor(idActor ,queryParams);
         call.enqueue(new Callback<Actor>() {
@@ -378,7 +378,7 @@ public class ActorDetailsActivity extends AppCompatActivity {
                     //ovde treba ispaliti odmah async task da skupi sve credits
                     getCreditsService(resp.getId());
                 } else {
-                    UtilTools.sharedPrefNotify(ActorDetailsActivity.this, getResources().getString(R.string.error) + response.code());
+                    UtilTools.sharedPrefNotify(ActorDetailsActivity.this, getResources().getString(R.string.error), "" + response.code());
                 }
             }
 
@@ -391,7 +391,7 @@ public class ActorDetailsActivity extends AppCompatActivity {
 
     private void getCreditsService(Integer idActor) {
         HashMap<String, String> queryParams = new HashMap<>();
-        queryParams.put(TMDB_APIKEY_PARAM_NAME, Contract.API_KEY);
+        queryParams.put(TMDB_APIKEY_PARAM_NAME, Contract.getApiKey(getBaseContext()));
 
         Call<Credit> call = TmdbApiService.apiInterface().TMDBGetMovieCredits(idActor ,queryParams);
         call.enqueue(new Callback<Credit>() {
@@ -401,7 +401,7 @@ public class ActorDetailsActivity extends AppCompatActivity {
                     Credit resp = response.body();
                     setupKnownForList(resp.getCast());
                 } else {
-                    UtilTools.sharedPrefNotify(ActorDetailsActivity.this, getResources().getString(R.string.error) + response.code());
+                    UtilTools.sharedPrefNotify(ActorDetailsActivity.this, getResources().getString(R.string.error), "" + response.code());
                 }
             }
 
