@@ -26,6 +26,7 @@ import androidx.drawerlayout.widget.DrawerLayout;
 import com.j256.ormlite.android.apptools.OpenHelperManager;
 import com.neuricius.masterproject.R;
 import com.neuricius.masterproject.adapter.DrawerListAdapter;
+import com.neuricius.masterproject.async.NetworkStateReceiver;
 import com.neuricius.masterproject.database.DbHelper;
 import com.neuricius.masterproject.database.model.MovieDB;
 import com.neuricius.masterproject.dialog.AboutDialog;
@@ -54,6 +55,7 @@ import static com.neuricius.masterproject.util.UtilTools.LOG_TAG_SQL_EXCEPTION;
 import static com.neuricius.masterproject.util.UtilTools.MOVIE_ID;
 import static com.neuricius.masterproject.util.UtilTools.TMDB_APIKEY_PARAM_NAME;
 import static com.neuricius.masterproject.util.UtilTools.TMDB_API_IMAGE_BASE_URL;
+import static com.neuricius.masterproject.util.UtilTools.setUpReceiver;
 
 public class MovieDetailsActivity extends AppCompatActivity {
 
@@ -90,6 +92,8 @@ public class MovieDetailsActivity extends AppCompatActivity {
     private Movie movieDBholder;
     private String genresDBholder;
 
+    private NetworkStateReceiver networkStateReceiver;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -99,6 +103,99 @@ public class MovieDetailsActivity extends AppCompatActivity {
         setupActionBar();
         Integer idMovie = getIntent().getIntExtra(MOVIE_ID, 0);
         getMovieService(idMovie);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        setUpReceiver(MovieDetailsActivity.this, networkStateReceiver);
+
+    }
+
+    @Override
+    protected void onPause() {
+        if(networkStateReceiver != null) {
+            unregisterReceiver(networkStateReceiver);
+            networkStateReceiver = null;
+        }
+        super.onPause();
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.activity_detail_options_menu, menu);
+        switch (getIntent().getStringExtra(INTENT_ORIGIN)) {
+            case INTENT_ORIGIN_NET:
+                menu.findItem(R.id.action_add).setTitle(getResources().getString(R.string.add_to_favorites));
+                break;
+            case INTENT_ORIGIN_DATABASE:
+                menu.findItem(R.id.action_add).setTitle(getResources().getString(R.string.remove_from_favorites));
+                break;
+            default:
+                menu.findItem(R.id.action_add).setVisible(false);
+                break;
+        }
+        return super.onCreateOptionsMenu(menu);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+            case R.id.action_add:
+                switch (getIntent().getStringExtra(INTENT_ORIGIN)) {
+                    case INTENT_ORIGIN_NET:
+                        boolean storagePermGranted;
+                        do{
+                            storagePermGranted = PermissionCheck.isStoragePermissionGranted(MovieDetailsActivity.this);
+                        } while (!storagePermGranted);
+                        addMovieToDB();
+                        break;
+                    case INTENT_ORIGIN_DATABASE:
+                        boolean storagePermGranted2;
+                        do{
+                            storagePermGranted2 = PermissionCheck.isStoragePermissionGranted(MovieDetailsActivity.this);
+                        } while (!storagePermGranted2);
+                        removeMovieFromDB();
+                        break;
+                    default:
+                        break;
+                }
+                break;
+        }
+
+        return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    public void setTitle(CharSequence title) {
+        getSupportActionBar().setTitle(title);
+    }
+
+    @Override
+    protected void onPostCreate(Bundle savedInstanceState) {
+        super.onPostCreate(savedInstanceState);
+        // Sync the toggle state after onRestoreInstanceState has occurred.
+        drawerToggle.syncState();
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        // Pass any configuration change to the drawer toggls
+        drawerToggle.onConfigurationChanged(newConfig);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+
+        // nakon rada sa bazo podataka potrebno je obavezno
+        //osloboditi resurse!
+        if (databaseHelper != null) {
+            OpenHelperManager.releaseHelper();
+            databaseHelper = null;
+        }
     }
 
     private void setupDrawer() {
@@ -209,51 +306,6 @@ public class MovieDetailsActivity extends AppCompatActivity {
 
     }
 
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.activity_detail_options_menu, menu);
-        switch (getIntent().getStringExtra(INTENT_ORIGIN)) {
-            case INTENT_ORIGIN_NET:
-                menu.findItem(R.id.action_add).setTitle(getResources().getString(R.string.add_to_favorites));
-                break;
-            case INTENT_ORIGIN_DATABASE:
-                menu.findItem(R.id.action_add).setTitle(getResources().getString(R.string.remove_from_favorites));
-                break;
-            default:
-                menu.findItem(R.id.action_add).setVisible(false);
-                break;
-        }
-        return super.onCreateOptionsMenu(menu);
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            case R.id.action_add:
-                switch (getIntent().getStringExtra(INTENT_ORIGIN)) {
-                    case INTENT_ORIGIN_NET:
-                        boolean storagePermGranted;
-                        do{
-                            storagePermGranted = PermissionCheck.isStoragePermissionGranted(MovieDetailsActivity.this);
-                        } while (!storagePermGranted);
-                        addMovieToDB();
-                        break;
-                    case INTENT_ORIGIN_DATABASE:
-                        boolean storagePermGranted2;
-                        do{
-                            storagePermGranted2 = PermissionCheck.isStoragePermissionGranted(MovieDetailsActivity.this);
-                        } while (!storagePermGranted2);
-                        removeMovieFromDB();
-                        break;
-                    default:
-                        break;
-                }
-                break;
-        }
-
-        return super.onOptionsItemSelected(item);
-    }
-
     private void removeMovieFromDB() {
         try {
             List<MovieDB> listaZaBrisanje = getDatabaseHelper().getMovieDao().queryBuilder()
@@ -287,25 +339,6 @@ public class MovieDetailsActivity extends AppCompatActivity {
             UtilTools.sharedPrefNotify(MovieDetailsActivity.this, getResources().getString(R.string.error) ,getResources().getString(R.string.please_try_again_later));
         }
 
-    }
-
-    @Override
-    public void setTitle(CharSequence title) {
-        getSupportActionBar().setTitle(title);
-    }
-
-    @Override
-    protected void onPostCreate(Bundle savedInstanceState) {
-        super.onPostCreate(savedInstanceState);
-        // Sync the toggle state after onRestoreInstanceState has occurred.
-        drawerToggle.syncState();
-    }
-
-    @Override
-    public void onConfigurationChanged(Configuration newConfig) {
-        super.onConfigurationChanged(newConfig);
-        // Pass any configuration change to the drawer toggls
-        drawerToggle.onConfigurationChanged(newConfig);
     }
 
     private void selectItemFromDrawer(int position) {
@@ -346,18 +379,6 @@ public class MovieDetailsActivity extends AppCompatActivity {
         return databaseHelper;
     }
 
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-
-        // nakon rada sa bazo podataka potrebno je obavezno
-        //osloboditi resurse!
-        if (databaseHelper != null) {
-            OpenHelperManager.releaseHelper();
-            databaseHelper = null;
-        }
-    }
-
     private void getMovieService(Integer idMovie){
 
         HashMap<String, String> queryParams = new HashMap<>();
@@ -381,6 +402,4 @@ public class MovieDetailsActivity extends AppCompatActivity {
             }
         });
     }
-
-
 }

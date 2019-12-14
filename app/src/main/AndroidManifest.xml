@@ -22,7 +22,6 @@
             android:noHistory="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
@@ -53,6 +52,8 @@
         Ovo je obavezno, bez definicije receiver-a necemo moci ni da ga koristimo.
         -->
         <receiver android:name=".async.SimpleReceiver" />
+        <receiver
+            android:name=".async.NetworkStateReceiver"
+            android:label="NetworkStateReceiver"/>
     </application>
-
 </manifest>

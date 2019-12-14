@@ -29,6 +29,7 @@ import com.j256.ormlite.android.apptools.OpenHelperManager;
 import com.neuricius.masterproject.R;
 import com.neuricius.masterproject.adapter.DrawerListAdapter;
 import com.neuricius.masterproject.adapter.RvCreditsAdapter;
+import com.neuricius.masterproject.async.NetworkStateReceiver;
 import com.neuricius.masterproject.database.DbHelper;
 import com.neuricius.masterproject.database.model.ActorDB;
 import com.neuricius.masterproject.dialog.AboutDialog;
@@ -59,6 +60,8 @@ import static com.neuricius.masterproject.util.UtilTools.INTENT_ORIGIN_NET;
 import static com.neuricius.masterproject.util.UtilTools.MOVIE_ID;
 import static com.neuricius.masterproject.util.UtilTools.TMDB_APIKEY_PARAM_NAME;
 import static com.neuricius.masterproject.util.UtilTools.TMDB_API_IMAGE_BASE_URL;
+import static com.neuricius.masterproject.util.UtilTools.setUpReceiver;
+import static com.neuricius.masterproject.util.UtilTools.sharedPrefNotify;
 
 public class ActorDetailsActivity extends AppCompatActivity {
 
@@ -94,9 +97,7 @@ public class ActorDetailsActivity extends AppCompatActivity {
 
     private Actor actorDBholder;
 
-    private boolean landscapeMode = false;
-    private boolean listShown = false;
-    private boolean detailShown = false;
+    private NetworkStateReceiver networkStateReceiver;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -110,10 +111,104 @@ public class ActorDetailsActivity extends AppCompatActivity {
         getActorService(idActor);
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        setUpReceiver(ActorDetailsActivity.this, networkStateReceiver);
+
+    }
+
+    @Override
+    protected void onPause() {
+        if(networkStateReceiver != null) {
+            unregisterReceiver(networkStateReceiver);
+            networkStateReceiver = null;
+        }
+        super.onPause();
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.activity_detail_options_menu, menu);
+        switch (getIntent().getStringExtra(INTENT_ORIGIN)) {
+            case INTENT_ORIGIN_NET:
+                menu.findItem(R.id.action_add).setTitle(getResources().getString(R.string.add_to_favorites));
+                break;
+            case INTENT_ORIGIN_DATABASE:
+                menu.findItem(R.id.action_add).setTitle(getResources().getString(R.string.remove_from_favorites));
+                break;
+            default:
+                menu.findItem(R.id.action_add).setVisible(false);
+                break;
+        }
+        return super.onCreateOptionsMenu(menu);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+            case R.id.action_add:
+                switch (getIntent().getStringExtra(INTENT_ORIGIN)) {
+                    case INTENT_ORIGIN_NET:
+                        boolean storagePermGranted;
+                        do{
+                            storagePermGranted = PermissionCheck.isStoragePermissionGranted(ActorDetailsActivity.this);
+                        } while (!storagePermGranted);
+                        addActorToDB();
+                        break;
+                    case INTENT_ORIGIN_DATABASE:
+                        boolean storagePermGranted2;
+                        do{
+                            storagePermGranted2 = PermissionCheck.isStoragePermissionGranted(ActorDetailsActivity.this);
+                        } while (!storagePermGranted2);
+                        removeActorFromDB();
+                        break;
+                    default:
+                        break;
+                }
+                break;
+        }
+
+        return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    public void setTitle(CharSequence title) {
+        getSupportActionBar().setTitle(title);
+    }
+
+    @Override
+    protected void onPostCreate(Bundle savedInstanceState) {
+        super.onPostCreate(savedInstanceState);
+        // Sync the toggle state after onRestoreInstanceState has occurred.
+        drawerToggle.syncState();
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        // Pass any configuration change to the drawer toggls
+        drawerToggle.onConfigurationChanged(newConfig);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+
+        // nakon rada sa bazo podataka potrebno je obavezno
+        //osloboditi resurse!
+        if (databaseHelper != null) {
+            OpenHelperManager.releaseHelper();
+            databaseHelper = null;
+        }
+        actorDBholder = null;
+    }
+
     public void setupKnownForList(final List<Cast> data) {
         rvKnownForList = findViewById(R.id.rvKnownForList);
 
-        GridLayoutManager glm = new GridLayoutManager( ActorDetailsActivity.this, 3 );
+        GridLayoutManager glm = new GridLayoutManager( ActorDetailsActivity.this, 4 );
         rvKnownForList.setLayoutManager(glm);
 
         RvCreditsAdapter rvCreditsAdapter = new RvCreditsAdapter(data, ActorDetailsActivity.this);
@@ -121,10 +216,14 @@ public class ActorDetailsActivity extends AppCompatActivity {
         rvCreditsAdapter.setListener(new RvCreditsAdapter.OnMovieClickListener() {
             @Override
             public void onMovieSelected(Movie movie) {
-                Intent movieIntent = new Intent(ActorDetailsActivity.this, MovieDetailsActivity.class);
-                movieIntent.putExtra(MOVIE_ID, movie.getId());
-                movieIntent.putExtra(INTENT_ORIGIN, INTENT_ORIGIN_NET);
-                startActivity(movieIntent);
+            if (UtilTools.sharedPrefPreserveData(ActorDetailsActivity.this)) {
+            Intent movieIntent = new Intent(ActorDetailsActivity.this, MovieDetailsActivity.class);
+            movieIntent.putExtra(MOVIE_ID, movie.getId());
+            movieIntent.putExtra(INTENT_ORIGIN, INTENT_ORIGIN_NET);
+            startActivity(movieIntent);
+            } else {
+                sharedPrefNotify(ActorDetailsActivity.this, getResources().getString(R.string.aborted) ,getResources().getString(R.string.not_on_wifi));
+            }
             }
         });
     }
@@ -230,51 +329,6 @@ public class ActorDetailsActivity extends AppCompatActivity {
         };
     }
 
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.activity_detail_options_menu, menu);
-        switch (getIntent().getStringExtra(INTENT_ORIGIN)) {
-            case INTENT_ORIGIN_NET:
-                menu.findItem(R.id.action_add).setTitle(getResources().getString(R.string.add_to_favorites));
-                break;
-            case INTENT_ORIGIN_DATABASE:
-                menu.findItem(R.id.action_add).setTitle(getResources().getString(R.string.remove_from_favorites));
-                break;
-            default:
-                menu.findItem(R.id.action_add).setVisible(false);
-                break;
-        }
-        return super.onCreateOptionsMenu(menu);
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            case R.id.action_add:
-                switch (getIntent().getStringExtra(INTENT_ORIGIN)) {
-                    case INTENT_ORIGIN_NET:
-                        boolean storagePermGranted;
-                        do{
-                            storagePermGranted = PermissionCheck.isStoragePermissionGranted(ActorDetailsActivity.this);
-                        } while (!storagePermGranted);
-                        addActorToDB();
-                        break;
-                    case INTENT_ORIGIN_DATABASE:
-                        boolean storagePermGranted2;
-                        do{
-                            storagePermGranted2 = PermissionCheck.isStoragePermissionGranted(ActorDetailsActivity.this);
-                        } while (!storagePermGranted2);
-                        removeActorFromDB();
-                        break;
-                    default:
-                        break;
-                }
-                break;
-        }
-
-        return super.onOptionsItemSelected(item);
-    }
-
     private void removeActorFromDB() {
         if (PermissionCheck.isStoragePermissionGranted(ActorDetailsActivity.this)){
             try {
@@ -313,25 +367,6 @@ public class ActorDetailsActivity extends AppCompatActivity {
 
 
 
-    }
-
-    @Override
-    public void setTitle(CharSequence title) {
-        getSupportActionBar().setTitle(title);
-    }
-
-    @Override
-    protected void onPostCreate(Bundle savedInstanceState) {
-        super.onPostCreate(savedInstanceState);
-        // Sync the toggle state after onRestoreInstanceState has occurred.
-        drawerToggle.syncState();
-    }
-
-    @Override
-    public void onConfigurationChanged(Configuration newConfig) {
-        super.onConfigurationChanged(newConfig);
-        // Pass any configuration change to the drawer toggls
-        drawerToggle.onConfigurationChanged(newConfig);
     }
 
     private void selectItemFromDrawer(int position) {
@@ -420,16 +455,5 @@ public class ActorDetailsActivity extends AppCompatActivity {
         return databaseHelper;
     }
 
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
 
-        // nakon rada sa bazo podataka potrebno je obavezno
-        //osloboditi resurse!
-        if (databaseHelper != null) {
-            OpenHelperManager.releaseHelper();
-            databaseHelper = null;
-        }
-        actorDBholder = null;
-    }
 }

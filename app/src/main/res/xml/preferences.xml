@@ -45,7 +45,6 @@
             android:defaultValue="false"/>
 
         <CheckBoxPreference
-            android:dependency="@string/conn_only_wifi"
             android:key="@string/warn_no_wifi"
             android:title="@string/no_wifi_warning"
             android:summary="@string/no_wifi_warning_summary"

@@ -72,5 +72,7 @@
     <string name="warn_no_wifi">warn_no_wifi</string>
     <string name="success">Success</string>
     <string name="tmdb_api_key">tmdb_api_key</string>
+    <string name="conn_type_wifi">WiFi</string>
+    <string name="conn_type_cell_data">Cellular data</string>
 
 </resources>

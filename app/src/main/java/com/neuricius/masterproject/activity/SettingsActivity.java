@@ -8,8 +8,13 @@ import androidx.core.app.NavUtils;
 import androidx.preference.PreferenceFragment;
 
 import com.neuricius.masterproject.R;
+import com.neuricius.masterproject.async.NetworkStateReceiver;
+
+import static com.neuricius.masterproject.util.UtilTools.setUpReceiver;
 
 public class SettingsActivity extends PreferenceActivity {
+
+    private NetworkStateReceiver networkStateReceiver;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,6 +37,18 @@ public class SettingsActivity extends PreferenceActivity {
     @Override
     protected void onResume() {
         super.onResume();
+
+        setUpReceiver(SettingsActivity.this, networkStateReceiver);
+
+    }
+
+    @Override
+    protected void onPause() {
+        if(networkStateReceiver != null) {
+            unregisterReceiver(networkStateReceiver);
+            networkStateReceiver = null;
+        }
+        super.onPause();
     }
 
     public static class PrefsFragment extends PreferenceFragment {

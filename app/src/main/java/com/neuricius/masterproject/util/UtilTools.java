@@ -28,8 +28,7 @@ import androidx.preference.PreferenceManager;
 
 import com.google.gson.Gson;
 import com.neuricius.masterproject.R;
-import com.neuricius.masterproject.async.SimpleReceiver;
-import com.neuricius.masterproject.async.SimpleService;
+import com.neuricius.masterproject.async.NetworkStateReceiver;
 import com.neuricius.masterproject.dialog.AboutDialog;
 import com.neuricius.masterproject.dialog.CustomDialog;
 import com.neuricius.masterproject.net.model.Cast;
@@ -52,7 +51,6 @@ public class UtilTools {
     private static CustomDialog customDialog;
     private static SharedPreferences sharedPreferences;
 
-    private static SimpleReceiver sync;
     private static PendingIntent pintent;
     private static AlarmManager alarm;
 
@@ -96,12 +94,13 @@ public class UtilTools {
         return TYPE_NOT_CONNECTED;
     }
 
-    public static String getConnectionType(Integer type){
+    public static String getConnectionType(Context context){
+        int type = getConnectivityStatus(context);
         switch (type){
             case 1:
-                return "WIFI";
+                return context.getString(R.string.conn_type_wifi);
             case 2:
-                return "Mobilni internet";
+                return context.getString(R.string.conn_type_cell_data);
             default:
                 return "";
         }
@@ -149,7 +148,7 @@ public class UtilTools {
 
         switch (notifyType) {
             case 1:
-                showToast(context, msg);
+                showToast(context, title, msg);
                 break;
             case 2:
                 showStatusMesage(context, title, msg);
@@ -163,16 +162,15 @@ public class UtilTools {
     public static boolean sharedPrefWarnNoWifi(Activity activity){
         sharedPreferences = PreferenceManager.getDefaultSharedPreferences(activity);
 
-        boolean conn = sharedPreferences.getBoolean(CONN_ONLY_WIFI, false);
-        boolean warn = sharedPreferences.getBoolean(WARN_NO_WIFI, false);
-
-        if (conn && warn && getConnectivityStatus(activity) != TYPE_WIFI){
-            sharedPrefNotify(activity, activity.getResources().getString(R.string.aborted) ,activity.getResources().getString(R.string.not_on_wifi));
-            return true;
-        }
-
-        return false;
+        return !sharedPreferences.getBoolean(WARN_NO_WIFI, false);
     }
+
+    public static boolean sharedPrefPreserveData(Activity activity) {
+        sharedPreferences = PreferenceManager.getDefaultSharedPreferences(activity);
+
+        return !sharedPreferences.getBoolean(CONN_ONLY_WIFI, false) && getConnectivityStatus(activity) == TYPE_WIFI;
+    }
+
 
     public static boolean sharedPrefNoSplashScreen(Context context){
         sharedPreferences = PreferenceManager.getDefaultSharedPreferences(context);
@@ -182,8 +180,8 @@ public class UtilTools {
     /** **/
 
 
-    public static void showToast(Context context, String text){
-        Toast.makeText(context, text, Toast.LENGTH_SHORT).show();
+    public static void showToast(Context context, String title, String text){
+        Toast.makeText(context, title + ": " +text, Toast.LENGTH_SHORT).show();
     }
 
     public static void showStatusMesage(Context context, String title, String message){
@@ -278,71 +276,15 @@ public class UtilTools {
     /*******/
 
     /**Rad sa servisima**/
-    public static void setUpSimpleReceiver(Activity activity, Integer minutes, Integer seconds){
-        sync = new SimpleReceiver();
+    public static void setUpReceiver(Context context, NetworkStateReceiver networkStateReceiver) {
 
-        IntentFilter filter = new IntentFilter();
-        filter.addAction(ACTION_CHECK_CONN);
-        activity.registerReceiver(sync, filter);
+        if(sharedPrefWarnNoWifi((Activity) context)) {
+            networkStateReceiver = new NetworkStateReceiver();
 
-        sharedPreferences = PreferenceManager.getDefaultSharedPreferences(activity);
+            IntentFilter intentFilter = new IntentFilter("android.net.conn.CONNECTIVITY_CHANGE");
 
-
-//        consultPreferences();
-        setUpManager(activity, minutes, seconds);
-    }
-
-    private static void setUpManager(Activity activity, Integer minutes, Integer seconds){
-        Intent intent = new Intent(activity, SimpleService.class);
-        int status = getConnectivityStatus(activity);
-        intent.putExtra(CONN_TYPE, status);
-
-        //allowSync i synctime su id opcija iz SharedPref
-        //allowsync boolean da li je dozvoljena autosinhronizacija
-        //synctime je String koji oznacava interval u minutima
-        boolean allowSync = PreferenceManager.getDefaultSharedPreferences(activity).getBoolean(activity.getResources().getString(R.string.autosync), false);
-        if (allowSync) {
-            pintent = PendingIntent.getService(activity, 0, intent, 0);
-            alarm = (AlarmManager) activity.getSystemService(Context.ALARM_SERVICE);
-            alarm.setRepeating(AlarmManager.RTC_WAKEUP, System.currentTimeMillis(),
-                    calculateTimeTillNextSync(minutes, seconds),
-                    pintent);
-
-            sharedPrefNotify(activity, "Alarm Manager" ,"Alarm Set");
+            context.registerReceiver(networkStateReceiver, intentFilter);
         }
     }
-
-    public static void killSimpleService(Activity activity){
-        if (alarm != null) {
-            alarm.cancel(pintent);
-            alarm = null;
-        }
-        if(sync != null){
-            activity.unregisterReceiver(sync);
-            sync = null;
-        }
-    }
-
-    /**ukoliko smo koristili servise i alarm manager
-     * neophodno je osloboditi resurse prilikom odlaska
-     * aktivnosti u drugi plan. Ovaj kod ide u aktivnost
-     * koja je zvala servis/alarm mngr
-     **/
-//    @Override
-//    protected void onPause() {
-//        if (manager != null) {
-//            manager.cancel(pendingIntent);
-//            manager = null;
-//        }
-//
-//
-//        if(sync != null){
-//            unregisterReceiver(sync);
-//            sync = null;
-//        }
-//
-//        super.onPause();
-//
-//    }
     /*******/
 }

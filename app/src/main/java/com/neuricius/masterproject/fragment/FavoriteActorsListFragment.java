@@ -60,7 +60,6 @@ public class FavoriteActorsListFragment extends Fragment {
             public void onFavoritesSelected(ActorDB idActor) {
 
                 Intent intent = new Intent(getContext(), ActorDetailsActivity.class);
-                //id u bazi krece od 1, a u listama od 0 ergo -1
                 intent.putExtra(ACTOR_ID, idActor.getId());
                 intent.putExtra(INTENT_ORIGIN, INTENT_ORIGIN_DATABASE);
                 startActivity(intent);

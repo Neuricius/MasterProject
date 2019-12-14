@@ -22,6 +22,7 @@ import android.widget.Spinner;
 import com.j256.ormlite.android.apptools.OpenHelperManager;
 import com.neuricius.masterproject.R;
 import com.neuricius.masterproject.adapter.DrawerListAdapter;
+import com.neuricius.masterproject.async.NetworkStateReceiver;
 import com.neuricius.masterproject.database.DbHelper;
 import com.neuricius.masterproject.database.model.ActorDB;
 import com.neuricius.masterproject.database.model.MovieDB;
@@ -35,6 +36,8 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.neuricius.masterproject.util.UtilTools.setUpReceiver;
+
 public class FavoritesActivity extends AppCompatActivity implements AdapterView.OnItemSelectedListener {
 
     /* The click listner for ListView in the navigation drawer */
@@ -47,8 +50,7 @@ public class FavoritesActivity extends AppCompatActivity implements AdapterView.
 
     }
 
-//    public static final String SPINNER_OPTION_ACTOR = "Actors";
-//    public static final String SPINNER_OPTION_MOVIE = "Movies";
+
 
     private Spinner spFavorites;
     private DrawerLayout drawerLayout;
@@ -59,16 +61,10 @@ public class FavoritesActivity extends AppCompatActivity implements AdapterView.
     private ArrayList<NavigationItem> navigationItems = new ArrayList<NavigationItem>();
     private AlertDialog dialog;
 
-//    private AdapterView.OnItemSelectedListener listener;
 
     private DbHelper databaseHelper;
 
-    private Actor actorDBholder;
-
-
-    private boolean landscapeMode = false;
-    private boolean listShown = false;
-    private boolean detailShown = false;
+    private NetworkStateReceiver networkStateReceiver;
 
     private FavoriteActorsListFragment favoriteActorsListFragment;
     private FavoriteMoviesListFragment favoriteMoviesListFragment;
@@ -84,86 +80,21 @@ public class FavoritesActivity extends AppCompatActivity implements AdapterView.
         setupSpinner();
     }
 
-    private void setupSpinner(){
-        spFavorites = findViewById(R.id.spFavorites);
-        spFavorites.setOnItemSelectedListener(this);
+    @Override
+    protected void onResume() {
+        super.onResume();
 
-        ArrayList<String> spinnerOptions = new ArrayList<>();
-        spinnerOptions.add(getResources().getString(R.string.actors));
-        spinnerOptions.add(getResources().getString(R.string.movies));
+        setUpReceiver(FavoritesActivity.this, networkStateReceiver);
 
-        ArrayAdapter aa = new ArrayAdapter(this,android.R.layout.simple_spinner_item, spinnerOptions);
-        aa.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spFavorites.setAdapter(aa);
     }
 
-    private void setupFavoriteActorsList(List<ActorDB> data) {
-        favoriteActorsListFragment = new FavoriteActorsListFragment();
-        favoriteActorsListFragment.setData(data);
-        FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
-        transaction.replace(R.id.flFavoritesFrame, favoriteActorsListFragment);
-        transaction.commit();
-    }
-
-    private void setupFavoriteMoviesList(List<MovieDB> data) {
-        favoriteMoviesListFragment = new FavoriteMoviesListFragment();
-        favoriteMoviesListFragment.setData(data);
-        FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
-        transaction.replace(R.id.flFavoritesFrame, favoriteMoviesListFragment);
-        transaction.commit();
-    }
-
-    private void setupDrawer() {
-        // Draws navigation items
-        navigationItems.add(new NavigationItem(getString(R.string.drawer_search), getString(R.string.drawer_search_long), R.drawable.ic_action_search_foreground));
-        navigationItems.add(new NavigationItem(getString(R.string.drawer_fav), getString(R.string.drawer_fav_long), R.drawable.ic_action_fav_foreground));
-        navigationItems.add(new NavigationItem(getString(R.string.drawer_settings), getString(R.string.drawer_settings_long), R.drawable.ic_action_settings_foreground));
-        navigationItems.add(new NavigationItem(getString(R.string.drawer_about), getString(R.string.drawer_about_long), R.drawable.ic_action_about_foreground));
-
-        drawerLayout = findViewById(R.id.drawer_layout);
-        drawerList = findViewById(R.id.navList);
-
-        // Populate the Navigtion Drawer with options
-        drawerPane = findViewById(R.id.drawerPane);
-        DrawerListAdapter adapter = new DrawerListAdapter(this, navigationItems);
-
-        // set a custom shadow that overlays the main content when the drawer opens
-        drawerLayout.setDrawerShadow(R.drawable.drawer_shadow, GravityCompat.START);
-        drawerList.setOnItemClickListener(new DrawerItemClickListener());
-        drawerList.setAdapter(adapter);
-    }
-
-    private void setupActionBar() {
-        // Enable ActionBar app icon to behave as action to toggle nav drawer
-        Toolbar toolbar = findViewById(R.id.toolbar);
-        setSupportActionBar(toolbar);
-        setTitle(getResources().getString(R.string.favourites));
-        final ActionBar actionBar = getSupportActionBar();
-
-        if (actionBar != null) {
-            actionBar.setDisplayHomeAsUpEnabled(true);
-            actionBar.setHomeAsUpIndicator(R.drawable.ic_action_home_foreground);
-            actionBar.setHomeButtonEnabled(true);
-            actionBar.show();
+    @Override
+    protected void onPause() {
+        if(networkStateReceiver != null) {
+            unregisterReceiver(networkStateReceiver);
+            networkStateReceiver = null;
         }
-
-        drawerToggle = new ActionBarDrawerToggle(
-                this,                  /* host Activity */
-                drawerLayout,         /* DrawerLayout object */
-                toolbar,  /* nav drawer image to replace 'Up' caret */
-                R.string.drawer_open,  /* "open drawer" description for accessibility */
-                R.string.drawer_close  /* "close drawer" description for accessibility */
-        ) {
-            public void onDrawerClosed(View view) {
-//                getSupportActionBar().setTitle(title);
-                invalidateOptionsMenu(); // creates call to onPrepareOptionsMenu()
-            }
-
-            public void onDrawerOpened(View drawerView) {
-//                getSupportActionBar().setTitle(drawerTitle);
-                invalidateOptionsMenu(); // creates call to onPrepareOptionsMenu()
-            }
-        };
+        super.onPause();
     }
 
     @Override
@@ -183,44 +114,6 @@ public class FavoritesActivity extends AppCompatActivity implements AdapterView.
         super.onConfigurationChanged(newConfig);
         // Pass any configuration change to the drawer toggls
         drawerToggle.onConfigurationChanged(newConfig);
-    }
-
-    private void selectItemFromDrawer(int position) {
-        switch (position) {
-            case 0:
-                Intent searchIntent = new Intent(FavoritesActivity.this, SearchActorsActivity.class);
-                startActivity(searchIntent);
-                break;
-            case 1:
-                Intent favIntent = new Intent(FavoritesActivity.this, FavoritesActivity.class);
-                startActivity(favIntent);
-                break;
-            case 2:
-                Intent settings = new Intent(FavoritesActivity.this, SettingsActivity.class);
-                startActivity(settings);
-                break;
-            case 3:
-                if (dialog == null){
-                    dialog = new AboutDialog(FavoritesActivity.this).prepareDialog();
-                } else {
-                    if (dialog.isShowing()) {
-                        dialog.dismiss();
-                    }
-                }
-                dialog.show();
-                break;
-        }
-
-        drawerList.setItemChecked(position, true);
-        drawerLayout.closeDrawer(drawerPane);
-    }
-
-    //Metoda koja komunicira sa bazom podataka
-    public DbHelper getDatabaseHelper() {
-        if (databaseHelper == null) {
-            databaseHelper = OpenHelperManager.getHelper(this, DbHelper.class);
-        }
-        return databaseHelper;
     }
 
     @Override
@@ -260,5 +153,125 @@ public class FavoritesActivity extends AppCompatActivity implements AdapterView.
     @Override
     public void onNothingSelected(AdapterView<?> parent) {
 
+    }
+
+    private void setupSpinner(){
+        spFavorites = findViewById(R.id.spFavorites);
+        spFavorites.setOnItemSelectedListener(this);
+
+        ArrayList<String> spinnerOptions = new ArrayList<>();
+        spinnerOptions.add(getResources().getString(R.string.actors));
+        spinnerOptions.add(getResources().getString(R.string.movies));
+
+        ArrayAdapter aa = new ArrayAdapter(this,android.R.layout.simple_spinner_item, spinnerOptions);
+        aa.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spFavorites.setAdapter(aa);
+    }
+
+    private void setupFavoriteActorsList(List<ActorDB> data) {
+        favoriteActorsListFragment = new FavoriteActorsListFragment();
+        favoriteActorsListFragment.setData(data);
+        FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
+        transaction.replace(R.id.flFavoritesFrame, favoriteActorsListFragment);
+        transaction.commit();
+    }
+
+    private void setupFavoriteMoviesList(List<MovieDB> data) {
+        favoriteMoviesListFragment = new FavoriteMoviesListFragment();
+        favoriteMoviesListFragment.setData(data);
+        FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
+        transaction.replace(R.id.flFavoritesFrame, favoriteMoviesListFragment);
+        transaction.commit();
+    }
+
+    private void setupActionBar() {
+        // Enable ActionBar app icon to behave as action to toggle nav drawer
+        Toolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        setTitle(getResources().getString(R.string.favourites));
+        final ActionBar actionBar = getSupportActionBar();
+
+        if (actionBar != null) {
+            actionBar.setDisplayHomeAsUpEnabled(true);
+            actionBar.setHomeAsUpIndicator(R.drawable.ic_action_home_foreground);
+            actionBar.setHomeButtonEnabled(true);
+            actionBar.show();
+        }
+
+        drawerToggle = new ActionBarDrawerToggle(
+                this,                  /* host Activity */
+                drawerLayout,         /* DrawerLayout object */
+                toolbar,  /* nav drawer image to replace 'Up' caret */
+                R.string.drawer_open,  /* "open drawer" description for accessibility */
+                R.string.drawer_close  /* "close drawer" description for accessibility */
+        ) {
+            public void onDrawerClosed(View view) {
+//                getSupportActionBar().setTitle(title);
+                invalidateOptionsMenu(); // creates call to onPrepareOptionsMenu()
+            }
+
+            public void onDrawerOpened(View drawerView) {
+//                getSupportActionBar().setTitle(drawerTitle);
+                invalidateOptionsMenu(); // creates call to onPrepareOptionsMenu()
+            }
+        };
+    }
+
+    private void setupDrawer() {
+        // Draws navigation items
+        navigationItems.add(new NavigationItem(getString(R.string.drawer_search), getString(R.string.drawer_search_long), R.drawable.ic_action_search_foreground));
+        navigationItems.add(new NavigationItem(getString(R.string.drawer_fav), getString(R.string.drawer_fav_long), R.drawable.ic_action_fav_foreground));
+        navigationItems.add(new NavigationItem(getString(R.string.drawer_settings), getString(R.string.drawer_settings_long), R.drawable.ic_action_settings_foreground));
+        navigationItems.add(new NavigationItem(getString(R.string.drawer_about), getString(R.string.drawer_about_long), R.drawable.ic_action_about_foreground));
+
+        drawerLayout = findViewById(R.id.drawer_layout);
+        drawerList = findViewById(R.id.navList);
+
+        // Populate the Navigtion Drawer with options
+        drawerPane = findViewById(R.id.drawerPane);
+        DrawerListAdapter adapter = new DrawerListAdapter(this, navigationItems);
+
+        // set a custom shadow that overlays the main content when the drawer opens
+        drawerLayout.setDrawerShadow(R.drawable.drawer_shadow, GravityCompat.START);
+        drawerList.setOnItemClickListener(new DrawerItemClickListener());
+        drawerList.setAdapter(adapter);
+    }
+
+    private void selectItemFromDrawer(int position) {
+        switch (position) {
+            case 0:
+                Intent searchIntent = new Intent(FavoritesActivity.this, SearchActorsActivity.class);
+                startActivity(searchIntent);
+                break;
+            case 1:
+                Intent favIntent = new Intent(FavoritesActivity.this, FavoritesActivity.class);
+                startActivity(favIntent);
+                break;
+            case 2:
+                Intent settings = new Intent(FavoritesActivity.this, SettingsActivity.class);
+                startActivity(settings);
+                break;
+            case 3:
+                if (dialog == null){
+                    dialog = new AboutDialog(FavoritesActivity.this).prepareDialog();
+                } else {
+                    if (dialog.isShowing()) {
+                        dialog.dismiss();
+                    }
+                }
+                dialog.show();
+                break;
+        }
+
+        drawerList.setItemChecked(position, true);
+        drawerLayout.closeDrawer(drawerPane);
+    }
+
+    //Metoda koja komunicira sa bazom podataka
+    public DbHelper getDatabaseHelper() {
+        if (databaseHelper == null) {
+            databaseHelper = OpenHelperManager.getHelper(this, DbHelper.class);
+        }
+        return databaseHelper;
     }
 }

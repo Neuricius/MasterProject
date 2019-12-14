@@ -1,11 +1,8 @@
 package com.neuricius.masterproject.activity;
 
-import android.Manifest;
-import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
-import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -14,26 +11,24 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.RelativeLayout;
-import android.widget.Toast;
 
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.ActionBarDrawerToggle;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
-import androidx.core.app.ActivityCompat;
 import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.fragment.app.FragmentTransaction;
 
 import com.neuricius.masterproject.R;
 import com.neuricius.masterproject.adapter.DrawerListAdapter;
+import com.neuricius.masterproject.async.NetworkStateReceiver;
 import com.neuricius.masterproject.fragment.ActorListFragment;
 import com.neuricius.masterproject.model.NavigationItem;
 import com.neuricius.masterproject.net.Contract;
 import com.neuricius.masterproject.net.TmdbApiService;
 import com.neuricius.masterproject.net.model.Result;
 import com.neuricius.masterproject.net.model.SearchResult;
-import com.neuricius.masterproject.util.PermissionCheck;
 import com.neuricius.masterproject.util.UtilTools;
 
 import java.util.ArrayList;
@@ -47,7 +42,8 @@ import retrofit2.Response;
 import static com.neuricius.masterproject.util.PermissionCheck.PERM_TAG;
 import static com.neuricius.masterproject.util.UtilTools.TMDB_APIKEY_PARAM_NAME;
 import static com.neuricius.masterproject.util.UtilTools.TMDB_QUERY_PARAM_NAME;
-import static com.neuricius.masterproject.util.UtilTools.killSimpleService;
+import static com.neuricius.masterproject.util.UtilTools.setUpReceiver;
+import static com.neuricius.masterproject.util.UtilTools.sharedPrefNotify;
 
 public class SearchActorsActivity extends AppCompatActivity {
 
@@ -67,12 +63,9 @@ public class SearchActorsActivity extends AppCompatActivity {
     private ArrayList<NavigationItem> navigationItems = new ArrayList<NavigationItem>();
 
 
-
-    private boolean landscapeMode = false;
-    private boolean listShown = false;
-    private boolean detailShown = false;
-
     private ActorListFragment actorListFragment;
+
+    private NetworkStateReceiver networkStateReceiver;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -85,19 +78,49 @@ public class SearchActorsActivity extends AppCompatActivity {
 
     }
 
-
     @Override
     protected void onResume() {
-        UtilTools.setUpSimpleReceiver(this, 0, 10);
         super.onResume();
+
+        setUpReceiver(SearchActorsActivity.this, networkStateReceiver);
     }
 
     @Override
     protected void onPause() {
-        killSimpleService(this);
+        if(networkStateReceiver != null) {
+            unregisterReceiver(networkStateReceiver);
+            networkStateReceiver = null;
+        }
         super.onPause();
     }
 
+    @Override
+    public void setTitle(CharSequence title) {
+        getSupportActionBar().setTitle(title);
+    }
+
+    @Override
+    protected void onPostCreate(Bundle savedInstanceState) {
+        super.onPostCreate(savedInstanceState);
+        // Sync the toggle state after onRestoreInstanceState has occurred.
+        drawerToggle.syncState();
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        // Pass any configuration change to the drawer toggls
+        drawerToggle.onConfigurationChanged(newConfig);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if(grantResults[0]== PackageManager.PERMISSION_GRANTED
+                && grantResults[1] == PackageManager.PERMISSION_GRANTED){
+            Log.v(PERM_TAG,"Permission: "+permissions[0]+ "was "+grantResults[0]);
+        }
+    }
 
     private void setupDrawer() {
         // Draws navigation items
@@ -177,25 +200,6 @@ public class SearchActorsActivity extends AppCompatActivity {
 //        return super.onOptionsItemSelected(item);
 //    }
 
-    @Override
-    public void setTitle(CharSequence title) {
-        getSupportActionBar().setTitle(title);
-    }
-
-    @Override
-    protected void onPostCreate(Bundle savedInstanceState) {
-        super.onPostCreate(savedInstanceState);
-        // Sync the toggle state after onRestoreInstanceState has occurred.
-        drawerToggle.syncState();
-    }
-
-    @Override
-    public void onConfigurationChanged(Configuration newConfig) {
-        super.onConfigurationChanged(newConfig);
-        // Pass any configuration change to the drawer toggls
-        drawerToggle.onConfigurationChanged(newConfig);
-    }
-
     private void selectItemFromDrawer(int position) {
         switch (position) {
             case 0:
@@ -222,8 +226,10 @@ public class SearchActorsActivity extends AppCompatActivity {
         bSearch.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (!UtilTools.sharedPrefWarnNoWifi(SearchActorsActivity.this)) {
+                if (UtilTools.sharedPrefPreserveData(SearchActorsActivity.this)) {
                     searchPeopleService(query.getText().toString()); //ne treba menjati prazna polja, izgleda da retrofit onda poludi
+                } else {
+                    sharedPrefNotify(SearchActorsActivity.this, getResources().getString(R.string.aborted) ,getResources().getString(R.string.not_on_wifi));
                 }
             }
         });
@@ -252,24 +258,17 @@ public class SearchActorsActivity extends AppCompatActivity {
                     SearchResult resp = response.body();
                     setupResultListRV(resp.getResults());
                 } else {
-                    UtilTools.sharedPrefNotify(SearchActorsActivity.this, getResources().getString(R.string.error), "" + response.code());
+                    sharedPrefNotify(SearchActorsActivity.this, getResources().getString(R.string.error), "" + response.code());
                 }
             }
 
             @Override
             public void onFailure(Call<SearchResult> call, Throwable t) {
-                UtilTools.sharedPrefNotify(SearchActorsActivity.this, getResources().getString(R.string.error), "" + t.getMessage());
+                sharedPrefNotify(SearchActorsActivity.this, getResources().getString(R.string.error), "" + t.getMessage());
             }
         });
     }
 
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if(grantResults[0]== PackageManager.PERMISSION_GRANTED
-                && grantResults[1] == PackageManager.PERMISSION_GRANTED){
-            Log.v(PERM_TAG,"Permission: "+permissions[0]+ "was "+grantResults[0]);
-        }
-    }
+
 
 }
